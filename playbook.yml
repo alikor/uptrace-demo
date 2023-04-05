@@ -1,0 +1,91 @@
+---
+- hosts: control
+  become: true
+  tasks:
+  - name: Install aptitude
+    apt:
+      name: aptitude
+      state: latest
+      update_cache: true
+
+  - name: Install required system packages
+    apt:
+      pkg:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - software-properties-common
+        - python3-pip
+        - virtualenv
+        - python3-setuptools
+      state: latest
+      update_cache: true
+
+  - name: Add Docker GPG apt Key
+    apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+
+  - name: Add Docker Repository
+    apt_repository:
+      repo: deb https://download.docker.com/linux/ubuntu focal stable
+      state: present
+
+  - name: Update apt and install docker-ce
+    apt:
+      name: docker-ce
+      state: latest
+      update_cache: true
+
+  - name: Install Docker Module for Python
+    pip:
+      name: docker
+
+
+  - name: Start clickhouse-server 
+    docker_container:
+      name: clickhouse-server
+      image: clickhouse/clickhouse-server
+      restart_policy: unless-stopped
+      published_ports:
+        - "8123:8123"
+        - "9000:9000"
+        - "9009:9009"
+      env:
+        CLICKHOUSE_PASSWORD: "uptrace"
+        CLICKHOUSE_USER: uptrace
+        CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+        CLICKHOUSE_DB: uptrace 
+
+  - name: Start postgres
+    docker_container:
+      name: postgres
+      image: postgres:15-alpine
+      restart_policy: on-failure
+      published_ports:
+        - '5432:5432'
+      env:
+        PGDATA: /var/lib/postgresql/data/pgdata
+        POSTGRES_USER: uptrace
+        POSTGRES_PASSWORD: uptrace
+        POSTGRES_DB: uptrace
+
+  - name: Update sshd configuration safely, avoid locking yourself out
+    ansible.builtin.template:
+      src: uptrace.yml.j2
+      dest: ./uptrace.yml
+      backup: yes
+
+  - name: Start uptrace 
+    docker_container:
+      name: uptrace
+      image: uptrace/uptrace:1.3.1
+      restart_policy: unless-stopped
+      published_ports:
+        - "80:80"
+        - "14318:14318"
+        - "14317:14317"
+      env:
+        UPTRACE_CONFIG: /home/vagrant/uptrace.yml
+      volumes:
+        - /home/vagrant/:/etc/uptrace
