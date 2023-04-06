@@ -89,3 +89,90 @@
         UPTRACE_CONFIG: /home/vagrant/uptrace.yml
       volumes:
         - /home/vagrant/:/etc/uptrace
+
+
+
+- hosts: vm1, vm2
+  become: true
+  tasks:
+  - name: Install aptitude
+    apt:
+      name: aptitude
+      state: latest
+      update_cache: true
+
+  - name: Install required system packages
+    apt:
+      pkg:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - software-properties-common
+        - python3-pip
+        - virtualenv
+        - python3-setuptools
+        - openjdk-17-jre
+      state: latest
+      update_cache: true
+
+  - name: Download OpenTelemetry Java agent
+    get_url:
+      url: https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+      dest: /opt/opentelemetry-javaagent.jar
+      mode: '0644'
+
+  - name: Create EchoService systemd service file
+    when: ansible_hostname == "vm2"
+    copy:
+      content: |
+        [Unit]
+        Description=Echo Service
+        After=network.target
+
+        [Service]
+        Environment="JAVA_TOOL_OPTIONS=-javaagent:/opt/opentelemetry-javaagent.jar  -Dotel.javaagent.configuration-file=/vagrant/uptrace.properties"
+        ExecStart=java -jar /vagrant/echo/target/echo-0.0.1-SNAPSHOT.jar
+        Restart=always
+
+        [Install]
+        WantedBy=multi-user.target
+      dest: /etc/systemd/system/DemoEchoService.service
+  - name: Start Echo service
+    when: ansible_hostname == "vm2"
+    systemd:
+      name: DemoEchoService
+      state: started
+      enabled: true
+
+  - name: Another symbolic mode example, adding some permissions and removing others
+    ansible.builtin.copy:
+      src: ./hello/target/hello-0.0.1-SNAPSHOT.jar
+      dest: /vagrant/hello-0.0.1-SNAPSHOT.jar
+      owner: vagrant
+      group: vagrant
+      mode: u+rw,g-wx,o-rwx
+
+  - name: Create helloService systemd service file
+    when: ansible_hostname == "vm1"
+    copy:
+      content: |
+        [Unit]
+        Description=Hello Service
+        After=network.target
+
+        [Service]
+        Environment="JAVA_TOOL_OPTIONS=-javaagent:/opt/opentelemetry-javaagent.jar  -Dotel.javaagent.configuration-file=/vagrant/uptrace.properties"
+        ExecStart=java -jar /vagrant/hello-0.0.1-SNAPSHOT.jar
+        Restart=always
+
+        [Install]
+        WantedBy=multi-user.target
+      dest: /etc/systemd/system/DemoHelloService.service
+
+  - name: Start Hello service
+    when: ansible_hostname == "vm1"
+    systemd:
+      name: DemoHelloService
+      state: started
+      enabled: true
+
