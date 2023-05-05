@@ -2,7 +2,7 @@
 - hosts: vm1, vm2
   become: true
   vars:
-    app_insights_instrumentation_key: "{{ lookup('env', 'app_insights_instrumentation_key') }}"
+    app_insights_instrumentation_key: "{{ lookup('env', 'APP_INSIGHTS_INSTRUMENTATION_KEY') }}"
   tasks:
   - name: Install aptitude
     apt:
