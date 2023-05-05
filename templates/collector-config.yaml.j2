@@ -1,0 +1,29 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+
+exporters:
+  azuremonitor:
+    instrumentation_key: {{ instrumentation_key }}
+processors:
+  batch:
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: []
+      exporters: [azuremonitor]
+    traces:
+      receivers: [otlp]
+      processors: []
+      exporters: [azuremonitor]
+    logs:
+      receivers: [otlp]
+      processors: []
+      exporters: [azuremonitor]
+  telemetry:
+    logs:
+      level: debug
