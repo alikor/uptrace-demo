@@ -7,6 +7,7 @@ receivers:
 exporters:
   azuremonitor:
     instrumentation_key: {{ instrumentation_key }}
+    spaneventsenabled: true
 processors:
   batch:
 
@@ -14,15 +15,12 @@ service:
   pipelines:
     metrics:
       receivers: [otlp]
-      processors: []
       exporters: [azuremonitor]
     traces:
       receivers: [otlp]
-      processors: []
       exporters: [azuremonitor]
     logs:
       receivers: [otlp]
-      processors: []
       exporters: [azuremonitor]
   telemetry:
     logs:
