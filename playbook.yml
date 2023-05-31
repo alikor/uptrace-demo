@@ -3,6 +3,7 @@
   become: true
   vars:
     app_insights_instrumentation_key: "{{ lookup('env', 'APP_INSIGHTS_INSTRUMENTATION_KEY') }}"
+    app_insights_connection_string: "{{ lookup('env', 'APPLICATIONINSIGHTS_CONNECTION_STRING') }}"
   tasks:
   - name: Install aptitude
     apt:
@@ -13,35 +14,28 @@
   - name: Install required system packages
     apt:
       pkg:
-        - apt-transport-https
-        - ca-certificates
-        - curl
-        - software-properties-common
-        - python3-pip
-        - virtualenv
-        - python3-setuptools
         - openjdk-17-jre
       state: latest
       update_cache: true
-  - name: Add Docker GPG apt Key
-    apt_key:
-      url: https://download.docker.com/linux/ubuntu/gpg
-      state: present
+  # - name: Add Docker GPG apt Key
+  #   apt_key:
+  #     url: https://download.docker.com/linux/ubuntu/gpg
+  #     state: present
 
-  - name: Add Docker Repository
-    apt_repository:
-      repo: deb https://download.docker.com/linux/ubuntu focal stable
-      state: present
+  # - name: Add Docker Repository
+  #   apt_repository:
+  #     repo: deb https://download.docker.com/linux/ubuntu focal stable
+  #     state: present
 
-  - name: Update apt and install docker-ce
-    apt:
-      name: docker-ce
-      state: latest
-      update_cache: true
+  # - name: Update apt and install docker-ce
+  #   apt:
+  #     name: docker-ce
+  #     state: latest
+  #     update_cache: true
 
-  - name: Install Docker Module for Python
-    pip:
-      name: docker
+  # - name: Install Docker Module for Python
+  #   pip:
+  #     name: docker
 
 
   # - name: Start clickhouse-server 
@@ -90,36 +84,50 @@
 
 
 
-  - name: Generate OpenTelemetry collector configuration
-    ansible.builtin.template:
-      src: collector-config.yaml.j2
-      dest: /etc/otel_config.yaml
-    vars:
-      otlp_endpoint: "0.0.0.0:4317"
-      instrumentation_key: "{{app_insights_instrumentation_key}}"
+  # - name: Generate OpenTelemetry collector configuration
+  #   ansible.builtin.template:
+  #     src: collector-config.yaml.j2
+  #     dest: /etc/otel_config.yaml
+  #   vars:
+  #     otlp_endpoint: "0.0.0.0:4317"
+  #     instrumentation_key: "{{app_insights_instrumentation_key}}"
 
-  - name: Run OpenTelemetry collector Docker container
-    ignore_errors: yes
-    docker_container:
-      name: opentelemetry_collector
-      image: otel/opentelemetry-collector-contrib
-      state: started
-      recreate: yes
-      command: --config /etc/otel/config.yaml
-      env:
-        OTEL_EXPORTER_OTLP_ENDPOINT: 0.0.0.0:4317
-      volumes:
-        - /etc/otel_config.yaml:/etc/otel/config.yaml
-      published_ports:
-        - 4317:4317
+  # - name: Run OpenTelemetry collector Docker container
+  #   ignore_errors: yes
+  #   docker_container:
+  #     name: opentelemetry_collector
+  #     image: otel/opentelemetry-collector-contrib
+  #     state: started
+  #     recreate: yes
+  #     command: --config /etc/otel/config.yaml
+  #     env:
+  #       OTEL_EXPORTER_OTLP_ENDPOINT: 0.0.0.0:4317
+  #     volumes:
+  #       - /etc/otel_config.yaml:/etc/otel/config.yaml
+  #     published_ports:
+  #       - 4317:4317
     
 
 
-  - name: Download OpenTelemetry Java agent
+  # - name: Download OpenTelemetry Java agent
+  #   get_url:
+  #     url: https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+  #     dest: /opt/opentelemetry-javaagent.jar
+  #     mode: '0644'
+      
+  - name: Download applicationinsights Java agent
     get_url:
-      url: https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
-      dest: /opt/opentelemetry-javaagent.jar
+      url: https://github.com/microsoft/ApplicationInsights-Java/releases/download/3.4.12/applicationinsights-agent-3.4.12.jar
+      dest: /opt/applicationinsights-javaagent.jar
       mode: '0644'
+
+
+  - name: Generate applicationinsights configuration
+    ansible.builtin.template:
+      src: applicationinsights.json.j2
+      dest: /opt/applicationinsights.json
+    vars:
+      connection_string: "{{app_insights_connection_string}}"
 
   - name: Create EchoService systemd service file
     when: ansible_hostname == "vm2"
@@ -130,7 +138,8 @@
         After=network.target
 
         [Service]
-        Environment="JAVA_TOOL_OPTIONS=-javaagent:/opt/opentelemetry-javaagent.jar "
+        Environment="APPLICATIONINSIGHTS_ROLE_NAME=echo "
+        Environment="JAVA_TOOL_OPTIONS=-javaagent:/opt/applicationinsights-javaagent.jar "
         ExecStart=java -jar /vagrant/echo/target/echo-0.0.1-SNAPSHOT.jar
         Restart=always
 
@@ -162,7 +171,8 @@
         After=network.target
 
         [Service]
-        Environment="JAVA_TOOL_OPTIONS=-javaagent:/opt/opentelemetry-javaagent.jar"
+        Environment="APPLICATIONINSIGHTS_ROLE_NAME=hello "
+        Environment="JAVA_TOOL_OPTIONS=-javaagent:/opt/applicationinsights-javaagent.jar"
         ExecStart=java -jar /vagrant/hello-0.0.1-SNAPSHOT.jar
         Restart=always
 

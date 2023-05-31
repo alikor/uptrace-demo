@@ -17,7 +17,7 @@ public class EchoController {
 
     @GetMapping("/echo/{input}")
     public String echo(@PathVariable String input) {
-        logger.info("XXX From echo Server");
+        logger.info("YYY From echo Server");
         return "From Echo Server:" + input;
     }
 }

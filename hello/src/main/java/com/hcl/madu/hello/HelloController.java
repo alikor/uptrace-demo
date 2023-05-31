@@ -23,7 +23,7 @@ public class HelloController {
     @GetMapping("/hello/{input}")
     public String echo(@PathVariable String input) {
         String output = this.restTemplate.getForObject("http://vm2:8080/echo/" + input, java.lang.String.class);
-        logger.info("From hello Server");
+        logger.info("YYY From hello Server");
         return "From hello Server:" + output;
     }
 }
